@@ -1,0 +1,30 @@
+name: Send Email on PR Merged
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  send_email:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send email with PR details
+        uses: dawidd6/action-send-mail@v3
+        with:
+          # Use secrets for sensitive values!
+          server_address: smtp.sendgrid.net
+          server_port: 587
+          username: apikey
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "PR Merged in ${{ github.repository }}"
+          to: jmoises@flvc.org
+          from: help@flvc.org
+          content_type: text/plain
+          body: |
+            The following pull request was merged:
+            Repository: ${{ github.repository }}
+            PR Title: ${{ github.event.pull_request.title }}
+            PR URL: ${{ github.event.pull_request.html_url }}
+            Merged by: ${{ github.actor }}
