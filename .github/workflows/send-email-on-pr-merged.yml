@@ -21,8 +21,7 @@ jobs:
           subject: "PR Merged in ${{ github.repository }}"
           to: jmoises@flvc.org
           from: help@flvc.org
-          content_type: text/plain
-          body: |
+          html_body: |
             The following pull request was merged:
             Repository: ${{ github.repository }}
             PR Title: ${{ github.event.pull_request.title }}
