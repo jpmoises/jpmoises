@@ -10,20 +10,26 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Send email with PR details
-        uses: dawidd6/action-send-mail@v3
-        with:
-          # Use secrets for sensitive values!
-          server_address: smtp.sendgrid.net
-          server_port: 587
-          username: apikey
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "PR Merged in ${{ github.repository }}"
-          to: jmoises@flvc.org
-          from: no-reply@flvc.org
-          html_body: |
-            The following pull request was merged:
-            Repository: ${{ github.repository }}
-            PR Title: ${{ github.event.pull_request.title }}
-            PR URL: ${{ github.event.pull_request.html_url }}
-            Merged by: ${{ github.actor }}
+      - name: Send Email using SendGrid
+        run: |
+          
+          BODY="Hello,\n\nThe latest build on branch '${{ github.ref_name }}' has completed.\nStatus: $BUILD_STATUS\nCommit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}\n\nView details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl --request POST \
+            --url https://api.sendgrid.com/v3/mail/send \
+            --header "Authorization: Bearer ${{ secrets.SMTP_PASSWORD }}" \
+            --header "Content-Type: application/json" \
+            --data "{
+              \"personalizations\": [
+                {
+                  \"to\": [{\"email\": \"jmoises@flvc.org\"}],
+                  \"subject\": \"PR Merged in ${{ github.repository }}\"
+                }
+              ],
+              \"from\": {\"email\": \"help@flvc.org\"},
+              \"content\": [
+                {
+                  \"type\": \"text/plain\",
+                  \"value\": \"$BODY\"
+                }
+              ]
+            }"
