@@ -15,11 +15,8 @@ jobs:
 
       - name: Determine PR status
         run: |
-          if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
-            echo "BUILD_STATUS=MERGED" >> $GITHUB_ENV
-          else
-            echo "BUILD_STATUS=CLOSED" >> $GITHUB_ENV
-
+           echo "BUILD_STATUS=MERGED" >> $GITHUB_ENV
+           
       - name: Send Email using SendGrid
         run: |
           SUBJECT="Pull Request Status: $BUILD_STATUS"
