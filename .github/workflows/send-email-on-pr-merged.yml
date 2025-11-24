@@ -20,7 +20,7 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: "PR Merged in ${{ github.repository }}"
           to: jmoises@flvc.org
-          from: no-reply@flvc.org
+          from: FLVC Help Desk <help@flvc.org>
           html_body: |
             The following pull request was merged:
             Repository: ${{ github.repository }}
