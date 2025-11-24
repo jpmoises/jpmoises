@@ -19,7 +19,7 @@ jobs:
            
       - name: Send Email using SendGrid
         run: |
-          SUBJECT="Pull Request Status: $BUILD_STATUS"
+          SUBJECT="Pull Request Status: ${{ $BUILD_STATUS }}"
           HTML_BODY="<html>
           <body style='font-family: Arial, sans-serif;'>
             <h2 style='color: #333;'>Pull Request Report</h2>
