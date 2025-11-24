@@ -23,11 +23,11 @@ jobs:
           HTML_BODY="<html>
           <body style='font-family: Arial, sans-serif;'>
             <h2 style='color: #333;'>Pull Request Report</h2>
-            <p>The pull request <strong>#${{ github.event.pull_request.number }}</strong> titled <em>${{ github.event.pull_request.title }}</em> has been <strong>$BUILD_STATUS</strong>.</p>
+            <p>The pull request <strong>#${{ github.event.pull_request.number }}</strong> titled <em>${{ github.event.pull_request.title }}</em> has been <strong>${{ $BUILD_STATUS }}</strong>.</p>
             <table style='border-collapse: collapse; width: 100%;'>
               <tr>
                 <td style='border: 1px solid #ccc; padding: 8px;'>Status</td>
-                <td style='border: 1px solid #ccc; padding: 8px; color: ${BUILD_STATUS == "MERGED" ? "#28a745" : "#dc3545"};'><strong>$BUILD_STATUS</strong></td>
+                <td style='border: 1px solid #ccc; padding: 8px; color: "#28a745";'><strong>${{ $BUILD_STATUS }}</strong></td>
               </tr>
               <tr>
                 <td style='border: 1px solid #ccc; padding: 8px;'>Author</td>
