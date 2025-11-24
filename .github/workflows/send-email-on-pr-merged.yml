@@ -112,6 +112,6 @@ jobs:
           curl --fail --silent --show-error \
             --request POST \
             --url https://api.sendgrid.com/v3/mail/send \
-            --header "Authorization: Bearer ${SENDGRID_API_KEY}" \
+            --header "Authorization: Bearer ${SMTP_PASSWORD}" \
             --header "Content-Type: application/json" \
             --data @payload.json
