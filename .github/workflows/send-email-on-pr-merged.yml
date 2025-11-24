@@ -4,60 +4,114 @@ name: Send Email via SendGrid
 on:
   pull_request:
     types:
-      - closed  # Trigger when PR is closed
+      - closed  # Trigger when PR is closed (merged or just closed)
 
 jobs:
-  build:
+  notify:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # Determine if the PR was merged or just closed
       - name: Determine PR status
         run: |
-           echo "BUILD_STATUS=MERGED" >> $GITHUB_ENV
-           
+          if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+            echo "BUILD_STATUS=MERGED" >> "$GITHUB_ENV"
+            echo "STATUS_COLOR=#28a745" >> "$GITHUB_ENV"   # green
+            echo "STATUS_EMOJI=✅" >> "$GITHUB_ENV"
+          else
+            echo "BUILD_STATUS=CLOSED" >> "$GITHUB_ENV"
+            echo "STATUS_COLOR=#6c757d" >> "$GITHUB_ENV"   # gray
+            echo "STATUS_EMOJI=❎" >> "$GITHUB_ENV"
+          fi
+
       - name: Send Email using SendGrid
+        env:
+          SENDGRID_API_KEY: ${{ secrets.SMTP_PASSWORD }}
         run: |
-          SUBJECT="Pull Request Status: ${{ $BUILD_STATUS }}"
-          HTML_BODY="<html>
-          <body style='font-family: Arial, sans-serif;'>
-            <h2 style='color: #333;'>Pull Request Report</h2>
-            <p>The pull request <strong>#${{ github.event.pull_request.number }}</strong> titled <em>${{ github.event.pull_request.title }}</em> has been <strong>${{ $BUILD_STATUS }}</strong>.</p>
-            <table style='border-collapse: collapse; width: 100%;'>
+          SUBJECT="Pull Request ${STATUS_EMOJI} ${BUILD_STATUS}: #${{ github.event.pull_request.number }}"
+          # Compose HTML with a heredoc to avoid escaping issues
+          HTML_BODY=$(cat <<'HTML'
+          <html>
+          <body style="font-family: Arial, sans-serif; color:#333; line-height:1.5;">
+            <h2 style="margin:0 0 12px;">Pull Request Report</h2>
+            <p>
+              The pull request <strong>#{{PR_NUMBER}}</strong> titled
+              <em>{{PR_TITLE}}</em> has been <strong style="color: {{STATUS_COLOR}};">{{BUILD_STATUS}}</strong>.
+            </p>
+            <table style="border-collapse: collapse; width: 100%; max-width: 720px;">
               <tr>
-                <td style='border: 1px solid #ccc; padding: 8px;'>Status</td>
-                <td style='border: 1px solid #ccc; padding: 8px; color: "#28a745";'><strong>${{ $BUILD_STATUS }}</strong></td>
+                <td style="border: 1px solid #ccc; padding: 8px;">Status</td>
+                <td style="border: 1px solid #ccc; padding: 8px; color: {{STATUS_COLOR}};"><strong>{{STATUS_EMOJI}} {{BUILD_STATUS}}</strong></td>
               </tr>
               <tr>
-                <td style='border: 1px solid #ccc; padding: 8px;'>Author</td>
-                <td style='border: 1px solid #ccc; padding: 8px;'>${{ github.event.pull_request.user.login }}</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">Author</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{PR_AUTHOR}}</td>
               </tr>
               <tr>
-                <td style='border: 1px solid #ccc; padding: 8px;'>Branch</td>
-                <td style='border: 1px solid #ccc; padding: 8px;'>${{ github.event.pull_request.head.ref }}</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">Source branch</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{PR_HEAD}}</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #ccc; padding: 8px;">Base branch</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{PR_BASE}}</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #ccc; padding: 8px;">Repository</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{REPO}}</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #ccc; padding: 8px;">Commit</td>
+                <td style="border: 1px solid #ccc; padding: 8px;">{{COMMIT_SHA}}</td>
               </tr>
             </table>
-            <p><a href='${{ github.event.pull_request.html_url }}' style='colorp>
-          </body>
-          </html>"
+            <p style="margin-top: 12px;">
+              {{PR_URL}}View Pull Request</a> •
+              <a href="{{RUN_URL}}" style="color: #007bff; text-decoration:/body>
+          </html>
+          HTML
+          )
 
-          curl --request POST \
+          # Substitute placeholders with GitHub-provided values and env vars
+          HTML_BODY="${HTML_BODY//\{\{PR_NUMBER\}\}/${{ github.event.pull_request.number }}}"
+          HTML_BODY="${HTML_BODY//\{\{PR_TITLE\}\}/${{ github.event.pull_request.title }}}"
+          HTML_BODY="${HTML_BODY//\{\{PR_AUTHOR\}\}/${{ github.event.pull_request.user.login }}}"
+          HTML_BODY="${HTML_BODY//\{\{PR_HEAD\}\}/${{ github.event.pull_request.head.ref }}}"
+          HTML_BODY="${HTML_BODY//\{\{PR_BASE\}\}/${{ github.event.pull_request.base.ref }}}"
+          HTML_BODY="${HTML_BODY//\{\{REPO\}\}/${{ github.repository }}}"
+          HTML_BODY="${HTML_BODY//\{\{COMMIT_SHA\}\}/${{ github.event.pull_request.head.sha }}}"
+          HTML_BODY="${HTML_BODY//\{\{PR_URL\}\}/${{ github.event.pull_request.html_url }}}"
+          HTML_BODY="${HTML_BODY//\{\{RUN_URL\}\/${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}}}"
+          HTML_BODY="${HTML_BODY//\{\{BUILD_STATUS\}\/$BUILD_STATUS}"
+          HTML_BODY="${HTML_BODY//\{\{STATUS_COLOR\}\/$STATUS_COLOR}"
+          HTML_BODY="${HTML_BODY//\{\{STATUS_EMOJI\}\/$STATUS_EMOJI}"
+
+          # Build JSON payload via heredoc to avoid escaping
+          cat >payload.json <<JSON
+          {
+            "personalizations": [
+              {
+                "to": [
+                  { "email": "jmoises@flvc.org" }
+                ],
+                "subject": "${SUBJECT}"
+              }
+            ],
+            "from": { "email": "help@flvc.org" },
+            "content": [
+              {
+                "type": "text/html",
+                "value": ${HTML_BODY@Q}
+              }
+            ]
+          }
+          JSON
+
+          # Send via SendGrid
+          curl --fail --silent --show-error \
+            --request POST \
             --url https://api.sendgrid.com/v3/mail/send \
-            --header "Authorization: Bearer ${{ secrets.SMTP_PASSWORD }}" \
+            --header "Authorization: Bearer ${SENDGRID_API_KEY}" \
             --header "Content-Type: application/json" \
-            --data "{
-              \"personalizations\": [
-                {
-                  \"to\": [{\"email\": \"jmoises@flvc.org\"}],
-                  \"subject\": \"$SUBJECT\"
-                }
-              ],
-              \"from\": {\"email\": \"help@flvc.org\"},
-              \"content\": [
-                {
-                  \"type\": \"text/html\",
-                  \"value\": \"$HTML_BODY\"
-                }
-              ]
-            }"
+            --data @payload.json
