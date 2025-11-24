@@ -1,29 +1,66 @@
-name: Send Email on PR Merged
+
+name: Send Email via SendGrid
 
 on:
   pull_request:
     types:
-      - closed
+      - closed  # Trigger when PR is closed
 
 jobs:
-  send_email:
-    if: github.event.pull_request.merged == true
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Send email with PR details
-        uses: dawidd6/action-send-mail@v3
-        with:
-          # Use secrets for sensitive values!
-          server_address: smtp.sendgrid.net
-          server_port: 587
-          username: apikey
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "PR Merged in ${{ github.repository }}"
-          to: jmoises@flvc.org
-          from: no-reply@flvc.org
-          html_body: |
-            The following pull request was merged:
-            Repository: ${{ github.repository }}
-            PR Title: ${{ github.event.pull_request.title }}
-            PR URL: ${{ github.event.pull_request.html_url }}
-            Merged by: ${{ github.actor }}
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Determine PR status
+        run: |
+          if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+            echo "BUILD_STATUS=MERGED" >> $GITHUB_ENV
+          else
+            echo "BUILD_STATUS=CLOSED" >> $GITHUB_ENV
+
+      - name: Send Email using SendGrid
+        run: |
+          SUBJECT="Pull Request Status: $BUILD_STATUS"
+          HTML_BODY="<html>
+          <body style='font-family: Arial, sans-serif;'>
+            <h2 style='color: #333;'>Pull Request Report</h2>
+            <p>The pull request <strong>#${{ github.event.pull_request.number }}</strong> titled <em>${{ github.event.pull_request.title }}</em> has been <strong>$BUILD_STATUS</strong>.</p>
+            <table style='border-collapse: collapse; width: 100%;'>
+              <tr>
+                <td style='border: 1px solid #ccc; padding: 8px;'>Status</td>
+                <td style='border: 1px solid #ccc; padding: 8px; color: ${BUILD_STATUS == "MERGED" ? "#28a745" : "#dc3545"};'><strong>$BUILD_STATUS</strong></td>
+              </tr>
+              <tr>
+                <td style='border: 1px solid #ccc; padding: 8px;'>Author</td>
+                <td style='border: 1px solid #ccc; padding: 8px;'>${{ github.event.pull_request.user.login }}</td>
+              </tr>
+              <tr>
+                <td style='border: 1px solid #ccc; padding: 8px;'>Branch</td>
+                <td style='border: 1px solid #ccc; padding: 8px;'>${{ github.event.pull_request.head.ref }}</td>
+              </tr>
+            </table>
+            <p><a href='${{ github.event.pull_request.html_url }}' style='colorp>
+          </body>
+          </html>"
+
+          curl --request POST \
+            --url https://api.sendgrid.com/v3/mail/send \
+            --header "Authorization: Bearer ${{ secrets.SMTP_PASSWORD }}" \
+            --header "Content-Type: application/json" \
+            --data "{
+              \"personalizations\": [
+                {
+                  \"to\": [{\"email\": \"jmoises@flvc.org\"}],
+                  \"subject\": \"$SUBJECT\"
+                }
+              ],
+              \"from\": {\"email\": \"help@flvc.org\"},
+              \"content\": [
+                {
+                  \"type\": \"text/html\",
+                  \"value\": \"$HTML_BODY\"
+                }
+              ]
+            }"
